@@ -5,7 +5,7 @@ Supports SQLite (dev) and PostgreSQL (prod) via DATABASE_URL.
 """
 
 from __future__ import annotations
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 import json
 import uuid
@@ -42,13 +42,18 @@ def get_db() -> Session:
 # ORM Models
 # ============================================================
 
+def utcnow_naive() -> datetime:
+    """Return naive UTC for existing database DateTime columns."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
 class ConversationRecord(Base):
     """Stores a full conversation session."""
     __tablename__ = "conversations"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    created_at = Column(DateTime, default=datetime.utcnow)
-    last_active = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
+    last_active = Column(DateTime, default=utcnow_naive, onupdate=utcnow_naive)
     language = Column(String(10), default="auto")
     message_count = Column(Integer, default=0)
     metadata_ = Column("metadata", JSON, nullable=True)
@@ -64,7 +69,7 @@ class MessageRecord(Base):
     content = Column(Text, nullable=False)
     tool_use_id = Column(String(100), nullable=True)
     tool_name = Column(String(100), nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=utcnow_naive)
     metadata_ = Column("metadata", JSON, nullable=True)
 
 
@@ -76,7 +81,7 @@ class MemoryRecord(Base):
     key = Column(String(255), nullable=False, index=True)
     value = Column(Text, nullable=False)
     category = Column(String(50), default="general")
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utcnow_naive)
     expires_at = Column(DateTime, nullable=True)
 
 
@@ -93,7 +98,7 @@ class AuditLogRecord(Base):
     success = Column(Boolean, default=True)
     error_message = Column(Text, nullable=True)
     duration_ms = Column(Integer, nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=utcnow_naive)
 
 
 # ============================================================
@@ -136,7 +141,7 @@ def add_message(
     conv = db.query(ConversationRecord).filter_by(id=conversation_id).first()
     if conv:
         conv.message_count = (conv.message_count or 0) + 1
-        conv.last_active = datetime.utcnow()
+        conv.last_active = utcnow_naive()
 
     db.commit()
     db.refresh(msg)
